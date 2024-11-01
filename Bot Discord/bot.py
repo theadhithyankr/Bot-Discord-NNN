@@ -2,10 +2,11 @@ import discord
 from discord.ext import commands, tasks
 import json
 from datetime import datetime
-import os
+from flask import Flask
+from threading import Thread
 
 # Directly set token
-TOKEN = "MTI5OTk4ODQwMjI1ODg0MTY0MA.GDjdJj.d9-A9Ahfke7JVO65uzzPsw_tDJFFkl6RNiUCkI"
+TOKEN = "TOKEN_ID"
 
 # Check if the token is loaded correctly
 if TOKEN is None:
@@ -23,16 +24,14 @@ def update_streak(user_id, reset=False):
     today = datetime.now().date()
     user_data = streaks.get(user_id, {"streak": 0, "last_checked_in": str(today)})
     last_checked_in = datetime.strptime(user_data["last_checked_in"], '%Y-%m-%d').date()
-    
-    # Reset or increment the streak
+
+    # Reset or increment the streak, without restricting to one check-in per day
     if reset or (today - last_checked_in).days > 1:
         user_data["streak"] = 0 if reset else 1
-    elif today == last_checked_in:  # Prevent multiple check-ins in a single day
-        return False
-    
     else:
         user_data["streak"] += 1
-    
+
+    # Update the last check-in date and save the user data
     user_data["last_checked_in"] = str(today)
     streaks[user_id] = user_data
     save_streaks()
@@ -61,22 +60,20 @@ async def on_ready():
 @bot.command(name="checkin")
 async def checkin(ctx):
     user_id = str(ctx.author.id)
-    if update_streak(user_id):
-        await ctx.send(f'{ctx.author.name}, streak updated! Current streak: {streaks[user_id]["streak"]} days')
-    else:
-        await ctx.send(f'{ctx.author.name}, you have already checked in today!')
+    update_streak(user_id)
+    await ctx.send(f'{ctx.author.name}, streak updated! Current streak: {streaks[user_id]["streak"]} days')
 
 @bot.command(name="fail")
 async def fail(ctx):
     user_id = str(ctx.author.id)
     update_streak(user_id, reset=True)
-    await ctx.send(f'{ctx.author.name}, you are a fuckin loser go die a virgin .Your streak has been reset.')
+    await ctx.send(f'{ctx.author.name}, you are a fucking loser.')
 
 @bot.command(name="streak")
 async def streak(ctx):
     user_id = str(ctx.author.id)
     streak_count = streaks.get(user_id, {}).get("streak", 0)
-    await ctx.send(f'{ctx.author.name}, Bro you are doing brotastically it,your current streak is {streak_count} days')
+    await ctx.send(f'{ctx.author.name}, your current streak is {streak_count} days')
 
 @bot.command(name="leaderboard")
 async def leaderboard(ctx):
@@ -86,7 +83,7 @@ async def leaderboard(ctx):
 # Daily task for displaying the leaderboard
 @tasks.loop(hours=24)
 async def daily_leaderboard():
-    channel_id = 1300003051540582500  # Replace with your channel ID
+    channel_id =   12345  # Replace with your channel ID
     channel = bot.get_channel(channel_id)
     if channel:
         leaderboard_message = get_leaderboard()
@@ -94,5 +91,16 @@ async def daily_leaderboard():
     else:
         print("Channel not found for daily leaderboard.")
 
-# Run the bot
+# Web server setup to keep bot running on Replit
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot is running!"
+
+def run():
+    app.run(host='0.0.0.0', port=8080)
+
+# Run bot and web server
+Thread(target=run).start()
 bot.run(TOKEN)
